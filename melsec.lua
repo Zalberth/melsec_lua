@@ -41,8 +41,14 @@ do
         -- 第二个参数代表的是字段占用数据的长度
         if (((tvb(0, 1):uint() == 80) and (tvb(1, 1):uint() == 0)) or ((tvb(0, 1):uint() == 208) and (tvb(1, 1):uint() == 0))) then
             -- 设置一些 UI 上面的信息
-            pinfo.cols.protocol:set("melsec")
-            pinfo.cols.info:set("melsec Protocol")
+            pinfo.cols.protocol:set("MELSEC")
+        
+
+            if (tvb(0, 1):uint() == 80) and (tvb(1, 1):uint() == 0) then
+                pinfo.cols.info:set("Request Command="..tvb:bytes(12, 1):tohex()..tvb:bytes(11, 1):tohex().." SubCommand="..tvb:bytes(14, 1):tohex()..tvb:bytes(13, 1):tohex())
+            else
+                pinfo.cols.info:set("Response")
+            end
 
             local offset = 0
             local tvb_len = tvb:len()
@@ -63,7 +69,7 @@ do
             offset = offset + 2 
             melsec_tree:add_le(melsec_cpu_monitor_timer, tvb:range(offset, 2))
             offset = offset + 2
-            melsec_tree:add(melsec_command, tvb:range(offset, 2))
+            melsec_tree:add_le(melsec_command, tvb:range(offset, 2))
             offset = offset + 2
             melsec_tree:add(melsec_sub_command, tvb:range(offset, 2))
             offset = offset + 2
