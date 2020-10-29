@@ -6,10 +6,13 @@ do
     local melsec_requested_module_IO_code = ProtoField.uint16("melsec.requested_module_io_code", "Requested Module IO Code", base.DEC)
     local melsec_requested_module_station_code = ProtoField.bytes("melsec.requested_module_station_code", "Requested Module Station Code", base.NONE)
     local melsec_requested_data_len = ProtoField.uint16("melsec.requested_data_len", "Requested Data Length", base.DEC)
+    local melsec_response_data_len = ProtoField.uint16("melsec.response_data_len", "Response Data Length", base.DEC)
     local melsec_cpu_monitor_timer = ProtoField.uint16("melsec.cpu_monitor_timer", "CPU Monitor Timer", base.DEC)
     local melsec_command = ProtoField.bytes("melsec.command", "command", base.NONE)
     local melsec_sub_command = ProtoField.bytes("melsec.sub_commnad", "Sub Command", base.NONE)
     local melsec_data_content = ProtoField.bytes("melsec.data_content", "Data Content", base.NONE)
+    local melsec_end_code = ProtoField.bytes("melsec.end_code", "End Code", base.NONE)
+
 
 
     -- 将字段添加都协议中
@@ -20,10 +23,12 @@ do
         melsec_requested_module_IO_code,
         melsec_requested_module_station_code,
         melsec_requested_data_len,
+        melsec_response_data_len,
         melsec_cpu_monitor_timer,
         melsec_command,
         melsec_sub_command,
-        melsec_data_content
+        melsec_data_content,
+        melsec_end_code,
     }
 
     --[[
@@ -43,17 +48,9 @@ do
             -- 设置一些 UI 上面的信息
             pinfo.cols.protocol:set("MELSEC")
         
-
-            if (tvb(0, 1):uint() == 80) and (tvb(1, 1):uint() == 0) then
-                pinfo.cols.info:set("Request Command="..tvb:bytes(12, 1):tohex()..tvb:bytes(11, 1):tohex().." SubCommand="..tvb:bytes(14, 1):tohex()..tvb:bytes(13, 1):tohex())
-            else
-                pinfo.cols.info:set("Response")
-            end
-
+            -- 在上一级解析树上创建 melsec 的根节点，插入通用字段
             local offset = 0
             local tvb_len = tvb:len()
-
-            -- 在上一级解析树上创建 melsec 的根节点
             local melsec_tree = treeitem:add(melsec_proto, tvb:range(offset))
             melsec_tree:add(melsec_sub_title, tvb:range(offset, 2))
             offset = offset + 2
@@ -63,17 +60,34 @@ do
             offset = offset + 1
             melsec_tree:add_le(melsec_requested_module_IO_code, tvb:range(offset, 2))
             offset = offset + 2
-            melsec_tree:add(melsec_requested_module_station_code, tvb:range(offset,  1))
+            melsec_tree:add(melsec_requested_module_station_code, tvb:range(offset,  1))   
             offset = offset + 1
-            melsec_tree:add_le(melsec_requested_data_len, tvb:range(offset, 2))
-            offset = offset + 2 
-            melsec_tree:add_le(melsec_cpu_monitor_timer, tvb:range(offset, 2))
-            offset = offset + 2
-            melsec_tree:add_le(melsec_command, tvb:range(offset, 2))
-            offset = offset + 2
-            melsec_tree:add(melsec_sub_command, tvb:range(offset, 2))
-            offset = offset + 2
-            melsec_tree:add(melsec_data_content, tvb:range(offset, tvb_len - offset))
+
+            if (tvb(0, 1):uint() == 80) and (tvb(1, 1):uint() == 0) then
+                -- 针对MC协议的请求作出解析，起始代码 50 00
+                pinfo.cols.info:set("Request Command="..tvb:bytes(12, 1):tohex()..tvb:bytes(11, 1):tohex().." SubCommand="..tvb:bytes(14, 1):tohex()..tvb:bytes(13, 1):tohex())
+                melsec_tree:add_le(melsec_requested_data_len, tvb:range(offset, 2)) 
+                offset = offset + 2
+                if tvb(offset -2, 2):le_uint() > 2 then     
+                    melsec_tree:add_le(melsec_cpu_monitor_timer, tvb:range(offset, 2))
+                    offset = offset + 2
+                    melsec_tree:add_le(melsec_command, tvb:range(offset, 2))
+                    offset = offset + 2
+                    melsec_tree:add(melsec_sub_command, tvb:range(offset, 2))
+                    offset = offset + 2
+                    melsec_tree:add(melsec_data_content, tvb:range(offset, tvb_len - offset))
+                end
+            else
+                -- 针对MC协议的响应作出解析，起始代码 D0 00
+                pinfo.cols.info:set("Response")
+                melsec_tree:add_le(melsec_response_data_len, tvb:range(offset, 2)) 
+                offset = offset + 2
+                melsec_tree:add(melsec_end_code, tvb:range(offset, 2))
+                offset = offset + 2
+                if tvb_len - offset > 0 then
+                    melsec_tree:add(melsec_data_content, tvb:range(offset, tvb_len - offset))
+                end
+            end
         end
     end
 
