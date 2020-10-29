@@ -1,5 +1,5 @@
 do
-    local melsec_proto = Proto("MELSEC", "MELSEC Protolcol")
+    local melsec_proto = Proto("MELSEC", "MELSEC Protocol")
     local melsec_sub_title = ProtoField.bytes("melsec.subtitle", "Sub Title", base.NONE)
     local melsec_network_code = ProtoField.bytes("melsec.networkcode", "Network Code", base.NONE)
     local melsec_PLC_NO = ProtoField.uint8("melsec.PLCNo", "PLC NO", base.DEC)
